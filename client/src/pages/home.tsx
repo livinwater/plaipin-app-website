@@ -89,17 +89,6 @@ export default function Home() {
           <Button 
             variant="outline" 
             className="flex flex-col items-center gap-2 h-auto py-6" 
-            data-testid="button-feed"
-            onClick={() => handleInteraction("feed", "Fed")}
-            disabled={interactMutation.isPending}
-          >
-            <Heart className="w-6 h-6 text-primary" />
-            <span>Feed</span>
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            className="flex flex-col items-center gap-2 h-auto py-6" 
             data-testid="button-play"
             onClick={() => handleInteraction("play", "Played")}
             disabled={interactMutation.isPending}
