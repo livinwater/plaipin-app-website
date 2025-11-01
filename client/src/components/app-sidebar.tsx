@@ -61,7 +61,7 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <div className="px-4 py-6">
-            <h1 className="text-2xl font-bold text-sidebar-primary">Plaipin</h1>
+            <h1 className="text-2xl font-bold text-sidebar-primary">PlaiPin</h1>
             <p className="text-sm text-muted-foreground mt-1">AI Companion</p>
           </div>
           <SidebarGroupContent>
