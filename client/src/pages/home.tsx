@@ -57,56 +57,24 @@ export default function Home() {
           </div>
         </div>
 
-        <Card className="bg-gradient-to-br from-primary/5 to-primary/10" data-testid="card-thoughts">
+        <Card className="bg-transparent border-none shadow-none" data-testid="card-thoughts">
           <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-              <div className="text-3xl">💭</div>
-              <div className="flex-1">
-                <p className="text-lg italic text-muted-foreground transition-all duration-500">
-                  {currentThought}
-                </p>
-              </div>
+            <div className="flex flex-col items-center justify-center text-center">
+              <p className="text-lg italic text-muted-foreground transition-all duration-500">
+                {currentThought}
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start gap-3" data-testid="activity-item-1">
-              <div className="w-2 h-2 rounded-full bg-primary mt-2"></div>
-              <div>
-                <p className="font-medium">Learned a new trick!</p>
-                <p className="text-sm text-muted-foreground">2 hours ago</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3" data-testid="activity-item-2">
-              <div className="w-2 h-2 rounded-full bg-primary mt-2"></div>
-              <div>
-                <p className="font-medium">Made a new friend nearby</p>
-                <p className="text-sm text-muted-foreground">5 hours ago</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3" data-testid="activity-item-3">
-              <div className="w-2 h-2 rounded-full bg-primary mt-2"></div>
-              <div>
-                <p className="font-medium">Completed daily challenges</p>
-                <p className="text-sm text-muted-foreground">Yesterday</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
+        <Card className="bg-transparent border-none shadow-none">
+          <CardHeader className="text-center">
             <CardTitle>Social Status</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-3 flex flex-col items-center">
             <button
               onClick={() => setSocialStatus("open")}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg hover-elevate transition-colors ${
+              className={`max-w-xs w-full flex items-center justify-center gap-3 p-3 rounded-lg hover-elevate transition-colors ${
                 socialStatus === "open" ? "bg-primary/10" : ""
               }`}
               data-testid="button-status-open"
@@ -121,7 +89,7 @@ export default function Home() {
             
             <button
               onClick={() => setSocialStatus("dnd")}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg hover-elevate transition-colors ${
+              className={`max-w-xs w-full flex items-center justify-center gap-3 p-3 rounded-lg hover-elevate transition-colors ${
                 socialStatus === "dnd" ? "bg-primary/10" : ""
               }`}
               data-testid="button-status-dnd"
@@ -136,7 +104,7 @@ export default function Home() {
             
             <button
               onClick={() => setSocialStatus("invisible")}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg hover-elevate transition-colors ${
+              className={`max-w-xs w-full flex items-center justify-center gap-3 p-3 rounded-lg hover-elevate transition-colors ${
                 socialStatus === "invisible" ? "bg-primary/10" : ""
               }`}
               data-testid="button-status-invisible"
