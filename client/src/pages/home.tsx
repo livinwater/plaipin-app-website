@@ -3,8 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import type { Companion } from "@shared/schema";
 import BuddyModel from "@/components/BuddyModel";
+import { useState } from "react";
 
 export default function Home() {
+  const [socialStatus, setSocialStatus] = useState<"open" | "dnd" | "invisible">("open");
+  
   const { data: companion, isLoading } = useQuery<Companion>({
     queryKey: ["/api/companion"],
   });
@@ -88,6 +91,58 @@ export default function Home() {
                 <p className="text-sm text-muted-foreground">Yesterday</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Social Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <button
+              onClick={() => setSocialStatus("open")}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg hover-elevate transition-colors ${
+                socialStatus === "open" ? "bg-primary/10" : ""
+              }`}
+              data-testid="button-status-open"
+            >
+              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                socialStatus === "open" ? "border-primary" : "border-muted-foreground"
+              }`}>
+                {socialStatus === "open" && <div className="w-2 h-2 rounded-full bg-primary" />}
+              </div>
+              <span className={socialStatus === "open" ? "font-medium" : ""}>Open to Connect</span>
+            </button>
+            
+            <button
+              onClick={() => setSocialStatus("dnd")}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg hover-elevate transition-colors ${
+                socialStatus === "dnd" ? "bg-primary/10" : ""
+              }`}
+              data-testid="button-status-dnd"
+            >
+              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                socialStatus === "dnd" ? "border-primary" : "border-muted-foreground"
+              }`}>
+                {socialStatus === "dnd" && <div className="w-2 h-2 rounded-full bg-primary" />}
+              </div>
+              <span className={socialStatus === "dnd" ? "font-medium" : ""}>Do Not Disturb</span>
+            </button>
+            
+            <button
+              onClick={() => setSocialStatus("invisible")}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg hover-elevate transition-colors ${
+                socialStatus === "invisible" ? "bg-primary/10" : ""
+              }`}
+              data-testid="button-status-invisible"
+            >
+              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                socialStatus === "invisible" ? "border-primary" : "border-muted-foreground"
+              }`}>
+                {socialStatus === "invisible" && <div className="w-2 h-2 rounded-full bg-primary" />}
+              </div>
+              <span className={socialStatus === "invisible" ? "font-medium" : ""}>Invisible Mode</span>
+            </button>
           </CardContent>
         </Card>
       </div>
