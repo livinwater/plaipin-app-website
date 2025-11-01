@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import Home from "@/pages/home";
 import Nearby from "@/pages/nearby";
 import Inbox from "@/pages/inbox";
+import SearchPage from "@/pages/search";
 import Journal from "@/pages/journal";
 import Store from "@/pages/store";
 import Inventory from "@/pages/inventory";
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/nearby" component={Nearby} />
       <Route path="/inbox" component={Inbox} />
+      <Route path="/search" component={SearchPage} />
       <Route path="/journal" component={Journal} />
       <Route path="/store" component={Store} />
       <Route path="/inventory" component={Inventory} />

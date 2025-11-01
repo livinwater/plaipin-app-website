@@ -1,4 +1,4 @@
-import { Home, Settings, MapPin, Inbox, BookOpen, Store, Package, Network } from "lucide-react";
+import { Home, Settings, MapPin, Inbox, Search, BookOpen, Store, Package, Network } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -25,6 +25,11 @@ const menuItems = [
     title: "Inbox",
     url: "/inbox",
     icon: Inbox,
+  },
+  {
+    title: "Search",
+    url: "/search",
+    icon: Search,
   },
   {
     title: "Journal",

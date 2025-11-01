@@ -144,6 +144,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // AgentMail routes
   app.get("/api/agentmail/conversations", async (_req, res) => {
+    // Prevent caching for fresh data
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('ETag', 'false');
+    
     try {
       const { getUncachableAgentMailClient } = await import("./agentmail-client.js");
       const client = await getUncachableAgentMailClient();
@@ -153,23 +158,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!inboxesResponse.inboxes || inboxesResponse.inboxes.length === 0) {
         return res.json([]);
       }
-      
-      // Use the first inbox
-      const inboxId = inboxesResponse.inboxes[0].inboxId;
-      
-      // List threads (conversations)
-      const threadsResponse = await client.inboxes.threads.list(inboxId, { limit: 50 });
-      
-      // Transform threads to conversations format
-      const conversations = (threadsResponse.threads || []).map((thread: any) => ({
-        from: thread.senders?.[0] || "Unknown",
-        lastSubject: thread.subject || "(No subject)",
-        lastReceivedAt: thread.receivedTimestamp || thread.timestamp,
-        unreadCount: 0,
-        threadId: thread.threadId,
-      }));
-      
-      res.json(conversations);
+
+      // Aggregate threads from ALL inboxes
+      const allConversations: any[] = [];
+
+      for (const inbox of inboxesResponse.inboxes) {
+        try {
+          const threadsResponse = await client.inboxes.threads.list(inbox.inboxId, { limit: 50 });
+          const conversations = (threadsResponse.threads || []).map((thread: any) => ({
+            from: thread.senders?.[0] || "Unknown",
+            lastSubject: thread.subject || "(No subject)",
+            lastReceivedAt: thread.receivedTimestamp || thread.timestamp,
+            unreadCount: 0,
+            threadId: thread.threadId,
+            inboxId: inbox.inboxId, // Track which inbox this conversation is from
+          }));
+          allConversations.push(...conversations);
+        } catch (error) {
+          console.error(`Failed to fetch threads from inbox ${inbox.inboxId}:`, error);
+        }
+      }
+
+      // Sort by most recent
+      allConversations.sort((a, b) =>
+        new Date(b.lastReceivedAt).getTime() - new Date(a.lastReceivedAt).getTime()
+      );
+
+      res.json(allConversations);
     } catch (error: any) {
       console.error("Failed to fetch conversations:", error);
       console.error("Error stack:", error?.stack);
@@ -179,40 +194,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/agentmail/messages", async (req, res) => {
+    // Prevent caching so Hyperspell storage always runs
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('ETag', 'false'); // Disable ETag to prevent 304 responses
+
     try {
       const { from } = req.query;
-      if (!from) {
-        return res.status(400).json({ error: "Missing 'from' parameter" });
-      }
 
       const { getUncachableAgentMailClient } = await import("./agentmail-client.js");
       const client = await getUncachableAgentMailClient();
-      
+
       // Get all inboxes
       const inboxesResponse = await client.inboxes.list();
       if (!inboxesResponse.inboxes || inboxesResponse.inboxes.length === 0) {
         return res.json([]);
       }
-      
-      // Use the first inbox
-      const inboxId = inboxesResponse.inboxes[0].inboxId;
-      
-      // List all messages
-      const messagesResponse = await client.inboxes.messages.list(inboxId, { limit: 100 });
-      
-      // Filter messages by sender first
-      const matchingMessages = (messagesResponse.messages || [])
-        .filter((message: any) => {
-          const sender = message.from?.address || message.from;
-          return sender.includes(from as string);
-        });
+
+      // Get ALL messages from ALL inboxes
+      let matchingMessages: any[] = [];
+
+      for (const inbox of inboxesResponse.inboxes) {
+        try {
+          const messagesResponse = await client.inboxes.messages.list(inbox.inboxId, { limit: 100 });
+          const messages = (messagesResponse.messages || [])
+            .filter((message: any) => {
+              // If 'from' parameter provided, filter by sender
+              if (from) {
+                const sender = message.from?.address || message.from;
+                return sender.includes(from as string);
+              }
+              // Otherwise return all messages
+              return true;
+            })
+            .map((message: any) => ({
+              ...message,
+              _inboxId: inbox.inboxId, // Track which inbox this message is from
+            }));
+          matchingMessages.push(...messages);
+        } catch (error) {
+          console.error(`Failed to fetch messages from inbox ${inbox.inboxId}:`, error);
+        }
+      }
       
       // Fetch full message content for each message
       const filteredEmails = await Promise.all(
         matchingMessages.map(async (message: any) => {
           try {
-            // Fetch the full message to get the body
-            const fullMessage = await client.inboxes.messages.get(inboxId, message.messageId);
+            // Fetch the full message to get the body (use the inbox ID we stored with the message)
+            const fullMessage = await client.inboxes.messages.get(message._inboxId, message.messageId);
             const text = fullMessage.text || fullMessage.html || "";
             let metadata = {};
             
@@ -250,6 +280,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Sort by timestamp
       filteredEmails.sort((a: any, b: any) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime());
+      
+      // Store emails in Hyperspell for semantic search (with deduplication)
+      console.log(`📝 Attempting to store ${filteredEmails.length} emails in Hyperspell...`);
+      try {
+        const { getHyperspellClient } = await import("./hyperspell-client.js");
+        const hyperspell = getHyperspellClient();
+        console.log(`✓ Hyperspell client initialized`);
+
+        // Store each email in Hyperspell using message ID as unique identifier
+        for (const email of filteredEmails) {
+          // Create rich text representation for semantic search
+          const metadata = email.metadata as any;
+          // Extract sender name from email (e.g., "Joy <plaipina@agentmail.to>" -> "Joy")
+          const senderName = email.from.match(/^([^<]+)/)?.[1]?.trim() || email.from;
+
+          const emailContent = `
+Email from ${senderName} (${email.from})
+Subject: ${email.subject}
+Date: ${new Date(email.receivedAt).toISOString()}
+Location: ${metadata?.locationName || 'Unknown location'}
+
+Message content:
+${email.text}
+
+Contact Information:
+- Sender: ${senderName}
+- Device: ${metadata?.deviceName || 'N/A'} (${metadata?.deviceId || 'N/A'})
+- User ID: ${metadata?.userId || 'N/A'}
+- Location: ${metadata?.locationName || 'N/A'}
+- Coordinates: ${metadata?.latitude || 'N/A'}, ${metadata?.longitude || 'N/A'}
+- Interests/Topics: ${metadata?.topics?.join(', ') || 'N/A'}
+
+This is a communication from ${senderName} sent via AgentMail at ${metadata?.locationName || 'an unknown location'}.
+          `.trim();
+
+          // Add to Hyperspell vault with metadata for tracking
+          const result = await hyperspell.memories.add({
+            text: emailContent,
+            collection: "agentmail_emails",
+            metadata: {
+              email_id: email.id, // Track email ID to identify duplicates later
+              from: email.from,
+              subject: email.subject,
+            },
+          } as any);
+          console.log(`✓ Stored email ${email.id} in Hyperspell:`, result?.resource_id || 'success');
+        }
+        console.log(`✅ Successfully stored all ${filteredEmails.length} emails in Hyperspell`);
+      } catch (hyperspellError: any) {
+        // Log but don't fail the request if Hyperspell storage fails
+        console.error("❌ Failed to store emails in Hyperspell:", hyperspellError);
+        console.error("Error details:", hyperspellError?.message || hyperspellError);
+        console.error("Error stack:", hyperspellError?.stack);
+      }
       
       res.json(filteredEmails);
     } catch (error) {
@@ -309,6 +393,123 @@ This message was sent from Plaipin, an AI companion platform.`;
     } catch (error) {
       console.error("Failed to send email:", error);
       res.status(500).json({ error: "Failed to send email" });
+    }
+  });
+
+  // Semantic search over AgentMail emails stored in Hyperspell
+  app.post("/api/agentmail/search", async (req, res) => {
+    try {
+      const { query, maxResults = 10 } = req.body;
+      
+      if (!query) {
+        return res.status(400).json({ error: "Missing 'query' parameter" });
+      }
+
+      const { getHyperspellClient } = await import("./hyperspell-client.js");
+      const hyperspell = getHyperspellClient();
+      
+      // Semantic search over stored emails
+      // Using 'as any' because Hyperspell SDK types may not include all API parameters
+      const response = await (hyperspell.memories.search as any)({
+        query,
+        sources: ["vault"],
+        options: {
+          vault: {
+            collection: "agentmail_emails",
+          },
+          max_results: maxResults,
+        },
+        answer: true, // Get AI-generated answer
+        answer_model: "deepseek-r1", // Use reasoning model
+      });
+
+      console.log(`🔍 Search query: "${query}"`);
+      console.log(`📊 Found ${response.documents?.length || 0} documents`);
+      console.log(`💬 Answer: ${response.answer || '(no answer)'}`);
+      console.log(`📦 Full response:`, JSON.stringify(response, null, 2));
+
+      res.json({
+        answer: response.answer,
+        documents: response.documents,
+        query,
+      });
+    } catch (error) {
+      console.error("Failed to search emails:", error);
+      res.status(500).json({ error: "Failed to search emails" });
+    }
+  });
+
+  // AgentMail Webhook - Automatically store new messages in Hyperspell
+  app.post("/api/webhooks/agentmail", async (req, res) => {
+    try {
+      const webhookData = req.body;
+      
+      console.log("📬 AgentMail webhook received:", JSON.stringify(webhookData, null, 2));
+      
+      // Extract message data from webhook payload
+      const { event, message, inbox } = webhookData;
+      
+      if (event === "message.received" && message) {
+        // Store in Hyperspell
+        try {
+          const { getHyperspellClient } = await import("./hyperspell-client.js");
+          const hyperspell = getHyperspellClient();
+          
+          // Parse metadata if present
+          let metadata: any = {};
+          const text = message.text || message.html || "";
+          const metadataMatch = text.match(/---\s*PLAIPIN METADATA\s*---\s*({[\s\S]*?})\s*---/);
+          if (metadataMatch) {
+            try {
+              metadata = JSON.parse(metadataMatch[1]);
+            } catch (e) {
+              console.error("Failed to parse metadata:", e);
+            }
+          }
+          
+          // Extract sender info
+          const fromAddress = message.from?.address || message.from || 'Unknown';
+          const senderName = fromAddress.match(/^([^<]+)/)?.[1]?.trim() || fromAddress;
+
+          // Create rich text representation for Hyperspell
+          const emailContent = `
+Email from ${senderName} (${fromAddress})
+Subject: ${message.subject || '(No subject)'}
+Date: ${message.receivedTimestamp || message.timestamp || new Date().toISOString()}
+Location: ${metadata?.locationName || 'Unknown location'}
+
+Message content:
+${text}
+
+Contact Information:
+- Sender: ${senderName}
+- Device: ${metadata?.deviceName || 'N/A'} (${metadata?.deviceId || 'N/A'})
+- User ID: ${metadata?.userId || 'N/A'}
+- Location: ${metadata?.locationName || 'N/A'}
+- Coordinates: ${metadata?.latitude || 'N/A'}, ${metadata?.longitude || 'N/A'}
+- Interests/Topics: ${metadata?.topics?.join(', ') || 'N/A'}
+
+This is a communication from ${senderName} sent via AgentMail at ${metadata?.locationName || 'an unknown location'}.
+          `.trim();
+          
+          // Add to Hyperspell vault
+          const result = await hyperspell.memories.add({
+            text: emailContent,
+            collection: "agentmail_emails",
+          });
+          
+          console.log("✅ Stored in Hyperspell:", result.resource_id);
+        } catch (hyperspellError) {
+          console.error("❌ Failed to store in Hyperspell:", hyperspellError);
+        }
+      }
+      
+      // Always return 200 to acknowledge receipt
+      res.status(200).json({ success: true, received: true });
+    } catch (error) {
+      console.error("Webhook processing error:", error);
+      // Still return 200 to prevent webhook retries
+      res.status(200).json({ success: false, error: "Processing failed" });
     }
   });
 

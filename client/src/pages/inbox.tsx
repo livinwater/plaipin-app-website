@@ -43,12 +43,14 @@ export default function Inbox() {
   const { data: messages = [] } = useQuery<EmailMessage[]>({
     queryKey: ["/api/agentmail/messages", selectedEmail],
     queryFn: async () => {
-      if (!selectedEmail) return [];
-      const response = await fetch(`/api/agentmail/messages?from=${encodeURIComponent(selectedEmail)}`);
+      // If selectedEmail is set, filter by that sender, otherwise get ALL messages
+      const url = selectedEmail
+        ? `/api/agentmail/messages?from=${encodeURIComponent(selectedEmail)}`
+        : '/api/agentmail/messages';
+      const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch messages');
       return response.json();
     },
-    enabled: !!selectedEmail,
   });
 
   const sendReplyMutation = useMutation({
@@ -109,14 +111,19 @@ export default function Inbox() {
       </div>
 
       <div className="flex-1 flex flex-col">
-        {selectedEmail ? (
-          <>
-            <div className="border-b border-border p-6">
-              <h2 className="text-xl font-bold" data-testid="text-active-conversation">{selectedEmail}</h2>
-            </div>
+        <div className="border-b border-border p-6">
+          <h2 className="text-xl font-bold" data-testid="text-active-conversation">
+            {selectedEmail || 'All Messages'}
+          </h2>
+        </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {messages.map((message) => (
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {messages.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">No messages yet</p>
+            </div>
+          ) : (
+            messages.map((message) => (
                 <Card key={message.id} data-testid={`message-${message.id}`}>
                   <CardContent className="p-4">
                     <div className="flex justify-between items-start mb-2">
@@ -175,19 +182,21 @@ export default function Inbox() {
                     )}
                   </CardContent>
                 </Card>
-              ))}
-            </div>
+              ))
+            )}
+          </div>
 
+          {selectedEmail && (
             <div className="border-t border-border p-6">
               <div className="flex gap-2">
-                <Input 
-                  placeholder="Type your reply..." 
+                <Input
+                  placeholder="Type your reply..."
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendReply()}
                   data-testid="input-reply"
                 />
-                <Button 
+                <Button
                   onClick={handleSendReply}
                   disabled={sendReplyMutation.isPending || !replyText.trim()}
                   data-testid="button-send-reply"
@@ -196,12 +205,7 @@ export default function Inbox() {
                 </Button>
               </div>
             </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <p className="text-muted-foreground">Select a conversation to view messages</p>
-          </div>
-        )}
+          )}
       </div>
     </div>
   );
