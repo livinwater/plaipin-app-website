@@ -4,11 +4,49 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 export default function Settings() {
   const [notifications, setNotifications] = useState(true);
   const [soundEffects, setSoundEffects] = useState(true);
+  const [companionName, setCompanionName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const companion = useQuery(api.companions.getDefault);
+  const updateCompanion = useMutation(api.companions.update);
+
+  // Initialize companion name from database
+  useEffect(() => {
+    if (companion) {
+      setCompanionName(companion.name);
+    }
+  }, [companion]);
+
+  const handleSaveSettings = async () => {
+    if (!companion) return;
+    
+    setIsSaving(true);
+    try {
+      await updateCompanion({
+        id: companion._id,
+        name: companionName,
+      });
+    } catch (error) {
+      console.error("Failed to update companion:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!companion) {
+    return (
+      <div className="p-8 max-w-4xl">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 max-w-4xl">
@@ -26,7 +64,12 @@ export default function Settings() {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="companion-name" data-testid="label-companion-name">Companion Name</Label>
-              <Input id="companion-name" defaultValue="Buddy" data-testid="input-companion-name" />
+              <Input 
+                id="companion-name" 
+                value={companionName}
+                onChange={(e) => setCompanionName(e.target.value)}
+                data-testid="input-companion-name" 
+              />
             </div>
             
             <div className="space-y-2">
@@ -92,7 +135,13 @@ export default function Settings() {
             </div>
             
             <div className="flex gap-2">
-              <Button data-testid="button-save-settings">Save Changes</Button>
+              <Button 
+                onClick={handleSaveSettings}
+                disabled={isSaving}
+                data-testid="button-save-settings"
+              >
+                {isSaving ? "Saving..." : "Save Changes"}
+              </Button>
               <Button variant="outline" data-testid="button-cancel">Cancel</Button>
             </div>
           </CardContent>

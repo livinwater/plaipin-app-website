@@ -170,9 +170,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
       
       res.json(conversations);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch conversations:", error);
-      res.status(500).json({ error: "Failed to fetch conversations" });
+      console.error("Error stack:", error?.stack);
+      console.error("Error message:", error?.message);
+      res.status(500).json({ error: "Failed to fetch conversations", details: error?.message });
     }
   });
 

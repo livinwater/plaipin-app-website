@@ -42,6 +42,12 @@ export default function Inbox() {
 
   const { data: messages = [] } = useQuery<EmailMessage[]>({
     queryKey: ["/api/agentmail/messages", selectedEmail],
+    queryFn: async () => {
+      if (!selectedEmail) return [];
+      const response = await fetch(`/api/agentmail/messages?from=${encodeURIComponent(selectedEmail)}`);
+      if (!response.ok) throw new Error('Failed to fetch messages');
+      return response.json();
+    },
     enabled: !!selectedEmail,
   });
 
