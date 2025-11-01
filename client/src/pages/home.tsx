@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useQuery } from "@tanstack/react-query";
-import type { Companion } from "@shared/schema";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import BuddyModel from "@/components/BuddyModel";
 import { useState, useEffect } from "react";
 
@@ -22,9 +22,7 @@ export default function Home() {
   const [socialStatus, setSocialStatus] = useState<"open" | "dnd" | "invisible">("open");
   const [currentThought, setCurrentThought] = useState(whimsicalThoughts[0]);
   
-  const { data: companion, isLoading } = useQuery<Companion>({
-    queryKey: ["/api/companion"],
-  });
+  const companion = useQuery(api.companions.getDefault);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -35,16 +33,16 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  if (isLoading || !companion) {
+  if (companion === undefined) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-full p-8">
+      <div className="flex flex-col items-center justify-center min-h-full p-8 bg-gradient-to-b from-[#E8E4F3] to-[#F5EFE7]">
         <div className="text-muted-foreground">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-full p-8">
+    <div className="flex flex-col items-center justify-start min-h-full p-8 bg-gradient-to-b from-[#E8E4F3] to-[#F5EFE7]">
       <div className="max-w-4xl w-full space-y-8">
         <div className="flex flex-col items-center space-y-6">
           <div className="w-64 h-64 flex items-center justify-center">

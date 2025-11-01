@@ -3,9 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send } from "lucide-react";
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Message } from "@shared/schema";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 const conversations = [
   { id: 1, name: "Luna", lastMessage: "Let's play together!", time: "2m ago", unread: true },
@@ -17,33 +16,24 @@ export default function Inbox() {
   const [selectedConversation, setSelectedConversation] = useState(conversations[0]);
   const [messageText, setMessageText] = useState("");
 
-  const { data: messages = [] } = useQuery<Message[]>({
-    queryKey: ["/api/messages", selectedConversation.name],
-    queryFn: async () => {
-      const response = await fetch(`/api/messages?conversationWith=${encodeURIComponent(selectedConversation.name)}`);
-      if (!response.ok) throw new Error("Failed to fetch messages");
-      return response.json();
-    },
-  });
+  const companion = useQuery(api.companions.getDefault);
+  const messages = useQuery(
+    api.messages.getByCompanion,
+    companion ? { companionId: companion._id, conversationWith: selectedConversation.name } : "skip"
+  ) ?? [];
 
-  const sendMessageMutation = useMutation({
-    mutationFn: async (message: { conversationWith: string; senderName: string; text: string; isOwn: number }) => {
-      return apiRequest("POST", "/api/messages", message);
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages", variables.conversationWith] });
-      setMessageText("");
-    },
-  });
+  const sendMessageMutation = useMutation(api.messages.create);
 
-  const handleSendMessage = () => {
-    if (messageText.trim()) {
-      sendMessageMutation.mutate({
+  const handleSendMessage = async () => {
+    if (messageText.trim() && companion) {
+      await sendMessageMutation({
+        companionId: companion._id,
         conversationWith: selectedConversation.name,
         senderName: "Buddy",
         text: messageText,
         isOwn: 1,
       });
+      setMessageText("");
     }
   };
 
@@ -80,14 +70,14 @@ export default function Inbox() {
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {messages.map((message) => (
             <div 
-              key={message.id}
+              key={message._id}
               className={`flex ${message.isOwn === 1 ? 'justify-end' : 'justify-start'}`}
-              data-testid={`message-${message.id}`}
+              data-testid={`message-${message._id}`}
             >
               <div className={`max-w-md ${message.isOwn === 1 ? 'bg-primary text-primary-foreground' : 'bg-card'} rounded-2xl px-4 py-3`}>
                 <p>{message.text}</p>
                 <p className={`text-xs mt-1 ${message.isOwn === 1 ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                  {new Date(message.createdAt).toLocaleTimeString('en-US', { 
+                  {new Date(message._creationTime).toLocaleTimeString('en-US', { 
                     hour: 'numeric', 
                     minute: '2-digit',
                     hour12: true 
@@ -109,7 +99,7 @@ export default function Inbox() {
             />
             <Button 
               onClick={handleSendMessage}
-              disabled={sendMessageMutation.isPending || !messageText.trim()}
+              disabled={!messageText.trim()}
               data-testid="button-send"
             >
               <Send className="w-4 h-4" />

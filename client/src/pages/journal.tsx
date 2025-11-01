@@ -5,9 +5,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Plus } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { JournalEntry } from "@shared/schema";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,16 +17,17 @@ export default function Journal() {
   const [content, setContent] = useState("");
   const [mood, setMood] = useState("");
 
-  const { data: entries = [], isLoading } = useQuery<JournalEntry[]>({
-    queryKey: ["/api/journal"],
-  });
+  const companion = useQuery(api.companions.getDefault);
+  const entries = useQuery(
+    api.journal.getByCompanion,
+    companion ? { companionId: companion._id } : "skip"
+  ) ?? [];
 
-  const createEntryMutation = useMutation({
-    mutationFn: async (entry: { title: string; content: string; mood: string }) => {
-      return apiRequest("POST", "/api/journal", entry);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/journal"] });
+  const createEntryMutation = useMutation(api.journal.create);
+
+  const handleSubmit = async () => {
+    if (title && content && mood && companion) {
+      await createEntryMutation({ companionId: companion._id, title, content, mood });
       setIsDialogOpen(false);
       setTitle("");
       setContent("");
@@ -36,16 +36,10 @@ export default function Journal() {
         title: "Entry created!",
         description: "Your journal entry has been saved",
       });
-    },
-  });
-
-  const handleSubmit = () => {
-    if (title && content && mood) {
-      createEntryMutation.mutate({ title, content, mood });
     }
   };
 
-  if (isLoading) {
+  if (entries === undefined) {
     return (
       <div className="p-8 max-w-4xl">
         <div className="text-muted-foreground">Loading journal...</div>
@@ -107,7 +101,7 @@ export default function Journal() {
             <DialogFooter>
               <Button 
                 onClick={handleSubmit}
-                disabled={createEntryMutation.isPending || !title || !content || !mood}
+                disabled={!title || !content || !mood}
                 data-testid="button-save-entry"
               >
                 Save Entry
@@ -119,24 +113,24 @@ export default function Journal() {
 
       <div className="space-y-6">
         {entries.map((entry) => (
-          <Card key={entry.id} className="hover-elevate cursor-pointer" data-testid={`card-entry-${entry.id}`}>
+          <Card key={entry._id} className="hover-elevate cursor-pointer" data-testid={`card-entry-${entry._id}`}>
             <CardHeader>
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1">
-                  <CardTitle className="mb-2" data-testid={`text-entry-title-${entry.id}`}>{entry.title}</CardTitle>
+                  <CardTitle className="mb-2" data-testid={`text-entry-title-${entry._id}`}>{entry.title}</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    {new Date(entry.createdAt).toLocaleDateString('en-US', { 
+                    {new Date(entry._creationTime).toLocaleDateString('en-US', { 
                       year: 'numeric', 
                       month: 'long', 
                       day: 'numeric' 
                     })}
                   </p>
                 </div>
-                <span className="text-2xl" data-testid={`text-entry-mood-${entry.id}`}>{entry.mood}</span>
+                <span className="text-2xl" data-testid={`text-entry-mood-${entry._id}`}>{entry.mood}</span>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground" data-testid={`text-entry-preview-${entry.id}`}>
+              <p className="text-muted-foreground" data-testid={`text-entry-preview-${entry._id}`}>
                 {entry.content}
               </p>
             </CardContent>
