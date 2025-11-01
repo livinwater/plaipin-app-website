@@ -40,6 +40,7 @@ export const journalEntries = pgTable("journal_entries", {
 export const messages = pgTable("messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companionId: varchar("companion_id").notNull(),
+  conversationWith: text("conversation_with").notNull(),
   senderName: text("sender_name").notNull(),
   text: text("text").notNull(),
   isOwn: integer("is_own").notNull().default(0),

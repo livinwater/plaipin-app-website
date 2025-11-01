@@ -2,9 +2,44 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Heart, Sparkles, TrendingUp } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Companion } from "@shared/schema";
 import buddyImage from "@assets/generated_images/Pink_bunny_AI_companion_e8d83ce8.png";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
+  const { toast } = useToast();
+
+  const { data: companion, isLoading } = useQuery<Companion>({
+    queryKey: ["/api/companion"],
+  });
+
+  const interactMutation = useMutation({
+    mutationFn: async (action: string) => {
+      return apiRequest("POST", "/api/companion/interact", { action });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/companion"] });
+    },
+  });
+
+  const handleInteraction = (action: string, label: string) => {
+    interactMutation.mutate(action);
+    toast({
+      title: `${label}!`,
+      description: `You just interacted with ${companion?.name || 'Buddy'}`,
+    });
+  };
+
+  if (isLoading || !companion) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-full p-8">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center justify-start min-h-full p-8">
       <div className="max-w-4xl w-full space-y-8">
@@ -19,9 +54,9 @@ export default function Home() {
           </div>
           
           <div className="text-center space-y-3">
-            <h1 className="text-4xl font-bold" data-testid="text-companion-name">Buddy</h1>
+            <h1 className="text-4xl font-bold" data-testid="text-companion-name">{companion.name}</h1>
             <Badge variant="secondary" className="rounded-full px-4 py-1.5 text-base" data-testid="badge-mood">
-              Happy
+              {companion.mood}
             </Badge>
           </div>
         </div>
@@ -32,7 +67,7 @@ export default function Home() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Energy</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">85%</div>
+              <div className="text-2xl font-bold">{companion.energy}%</div>
             </CardContent>
           </Card>
           
@@ -41,7 +76,7 @@ export default function Home() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Happiness</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">92%</div>
+              <div className="text-2xl font-bold">{companion.happiness}%</div>
             </CardContent>
           </Card>
           
@@ -50,23 +85,41 @@ export default function Home() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Level</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">12</div>
+              <div className="text-2xl font-bold">{companion.level}</div>
             </CardContent>
           </Card>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
-          <Button variant="outline" className="flex flex-col items-center gap-2 h-auto py-6" data-testid="button-feed">
+          <Button 
+            variant="outline" 
+            className="flex flex-col items-center gap-2 h-auto py-6" 
+            data-testid="button-feed"
+            onClick={() => handleInteraction("feed", "Fed")}
+            disabled={interactMutation.isPending}
+          >
             <Heart className="w-6 h-6 text-primary" />
             <span>Feed</span>
           </Button>
           
-          <Button variant="outline" className="flex flex-col items-center gap-2 h-auto py-6" data-testid="button-play">
+          <Button 
+            variant="outline" 
+            className="flex flex-col items-center gap-2 h-auto py-6" 
+            data-testid="button-play"
+            onClick={() => handleInteraction("play", "Played")}
+            disabled={interactMutation.isPending}
+          >
             <Sparkles className="w-6 h-6 text-primary" />
             <span>Play</span>
           </Button>
           
-          <Button variant="outline" className="flex flex-col items-center gap-2 h-auto py-6" data-testid="button-train">
+          <Button 
+            variant="outline" 
+            className="flex flex-col items-center gap-2 h-auto py-6" 
+            data-testid="button-train"
+            onClick={() => handleInteraction("train", "Trained")}
+            disabled={interactMutation.isPending}
+          >
             <TrendingUp className="w-6 h-6 text-primary" />
             <span>Train</span>
           </Button>

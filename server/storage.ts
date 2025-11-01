@@ -27,7 +27,7 @@ export interface IStorage {
   getJournalEntries(companionId: string): Promise<JournalEntry[]>;
   createJournalEntry(entry: InsertJournalEntry): Promise<JournalEntry>;
   
-  getMessages(companionId: string): Promise<Message[]>;
+  getMessages(companionId: string, conversationWith?: string): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
 }
 
@@ -132,6 +132,7 @@ export class MemStorage implements IStorage {
       {
         id: randomUUID(),
         companionId: this.defaultCompanionId,
+        conversationWith: "Luna",
         senderName: "Luna",
         text: "Hey Buddy! How are you today?",
         isOwn: 0,
@@ -140,9 +141,19 @@ export class MemStorage implements IStorage {
       {
         id: randomUUID(),
         companionId: this.defaultCompanionId,
+        conversationWith: "Luna",
         senderName: "Buddy",
         text: "I'm doing great! Just finished training.",
         isOwn: 1,
+        createdAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        companionId: this.defaultCompanionId,
+        conversationWith: "Luna",
+        senderName: "Luna",
+        text: "Let's play together!",
+        isOwn: 0,
         createdAt: new Date(),
       },
     ];
@@ -230,9 +241,12 @@ export class MemStorage implements IStorage {
     return entry;
   }
 
-  async getMessages(companionId: string): Promise<Message[]> {
+  async getMessages(companionId: string, conversationWith?: string): Promise<Message[]> {
     return Array.from(this.messages.values())
-      .filter(msg => msg.companionId === companionId)
+      .filter(msg => 
+        msg.companionId === companionId &&
+        (!conversationWith || msg.conversationWith === conversationWith)
+      )
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
 
@@ -240,6 +254,7 @@ export class MemStorage implements IStorage {
     const message: Message = {
       id: randomUUID(),
       companionId: insertMessage.companionId,
+      conversationWith: insertMessage.conversationWith,
       senderName: insertMessage.senderName,
       text: insertMessage.text,
       isOwn: insertMessage.isOwn ?? 0,

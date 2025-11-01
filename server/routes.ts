@@ -116,10 +116,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/messages", async (_req, res) => {
+  app.get("/api/messages", async (req, res) => {
     try {
       const companion = await storage.getDefaultCompanion();
-      const messages = await storage.getMessages(companion.id);
+      const { conversationWith } = req.query;
+      const messages = await storage.getMessages(companion.id, conversationWith as string | undefined);
       res.json(messages);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch messages" });

@@ -3,6 +3,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send } from "lucide-react";
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Message } from "@shared/schema";
 
 const conversations = [
   { id: 1, name: "Luna", lastMessage: "Let's play together!", time: "2m ago", unread: true },
@@ -10,20 +13,37 @@ const conversations = [
   { id: 3, name: "Stella", lastMessage: "See you tomorrow!", time: "3h ago", unread: false },
 ];
 
-const messages = [
-  { id: 1, sender: "Luna", text: "Hey Buddy! How are you today?", time: "10:30 AM", isOwn: false },
-  { id: 2, sender: "Buddy", text: "I'm doing great! Just finished training.", time: "10:32 AM", isOwn: true },
-  { id: 3, sender: "Luna", text: "Let's play together!", time: "10:35 AM", isOwn: false },
-];
-
 export default function Inbox() {
   const [selectedConversation, setSelectedConversation] = useState(conversations[0]);
   const [messageText, setMessageText] = useState("");
 
+  const { data: messages = [] } = useQuery<Message[]>({
+    queryKey: ["/api/messages", selectedConversation.name],
+    queryFn: async () => {
+      const response = await fetch(`/api/messages?conversationWith=${encodeURIComponent(selectedConversation.name)}`);
+      if (!response.ok) throw new Error("Failed to fetch messages");
+      return response.json();
+    },
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async (message: { conversationWith: string; senderName: string; text: string; isOwn: number }) => {
+      return apiRequest("POST", "/api/messages", message);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messages", variables.conversationWith] });
+      setMessageText("");
+    },
+  });
+
   const handleSendMessage = () => {
     if (messageText.trim()) {
-      console.log('Sending message:', messageText);
-      setMessageText("");
+      sendMessageMutation.mutate({
+        conversationWith: selectedConversation.name,
+        senderName: "Buddy",
+        text: messageText,
+        isOwn: 1,
+      });
     }
   };
 
@@ -61,13 +81,17 @@ export default function Inbox() {
           {messages.map((message) => (
             <div 
               key={message.id}
-              className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'}`}
+              className={`flex ${message.isOwn === 1 ? 'justify-end' : 'justify-start'}`}
               data-testid={`message-${message.id}`}
             >
-              <div className={`max-w-md ${message.isOwn ? 'bg-primary text-primary-foreground' : 'bg-card'} rounded-2xl px-4 py-3`}>
+              <div className={`max-w-md ${message.isOwn === 1 ? 'bg-primary text-primary-foreground' : 'bg-card'} rounded-2xl px-4 py-3`}>
                 <p>{message.text}</p>
-                <p className={`text-xs mt-1 ${message.isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                  {message.time}
+                <p className={`text-xs mt-1 ${message.isOwn === 1 ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                  {new Date(message.createdAt).toLocaleTimeString('en-US', { 
+                    hour: 'numeric', 
+                    minute: '2-digit',
+                    hour12: true 
+                  })}
                 </p>
               </div>
             </div>
@@ -83,7 +107,11 @@ export default function Inbox() {
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
               data-testid="input-message"
             />
-            <Button onClick={handleSendMessage} data-testid="button-send">
+            <Button 
+              onClick={handleSendMessage}
+              disabled={sendMessageMutation.isPending || !messageText.trim()}
+              data-testid="button-send"
+            >
               <Send className="w-4 h-4" />
             </Button>
           </div>

@@ -2,17 +2,39 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ShoppingCart } from "lucide-react";
-
-const storeItems = [
-  { id: 1, name: "Rainbow Ball", price: 150, category: "Toys", color: "bg-gradient-to-br from-red-400 to-purple-400" },
-  { id: 2, name: "Cozy Bed", price: 300, category: "Furniture", color: "bg-gradient-to-br from-blue-400 to-cyan-400" },
-  { id: 3, name: "Party Hat", price: 100, category: "Accessories", color: "bg-gradient-to-br from-yellow-400 to-orange-400" },
-  { id: 4, name: "Training Guide", price: 200, category: "Books", color: "bg-gradient-to-br from-green-400 to-emerald-400" },
-  { id: 5, name: "Friendship Bracelet", price: 120, category: "Accessories", color: "bg-gradient-to-br from-pink-400 to-rose-400" },
-  { id: 6, name: "Energy Drink", price: 80, category: "Consumables", color: "bg-gradient-to-br from-purple-400 to-indigo-400" },
-];
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Item } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Store() {
+  const { toast } = useToast();
+
+  const { data: items = [], isLoading } = useQuery<Item[]>({
+    queryKey: ["/api/store/items"],
+  });
+
+  const purchaseMutation = useMutation({
+    mutationFn: async (itemId: string) => {
+      return apiRequest("POST", "/api/inventory/purchase", { itemId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      toast({
+        title: "Purchase successful!",
+        description: "Item added to your inventory",
+      });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="p-8 max-w-6xl">
+        <div className="text-muted-foreground">Loading store...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-8 max-w-6xl">
       <div className="flex justify-between items-center mb-8">
@@ -27,7 +49,7 @@ export default function Store() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {storeItems.map((item) => (
+        {items.map((item) => (
           <Card key={item.id} className="hover-elevate" data-testid={`card-item-${item.id}`}>
             <CardHeader>
               <div className={`w-full h-40 rounded-lg ${item.color} mb-4`}></div>
@@ -44,7 +66,12 @@ export default function Store() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button className="w-full" data-testid={`button-buy-${item.id}`}>
+              <Button 
+                className="w-full" 
+                data-testid={`button-buy-${item.id}`}
+                onClick={() => purchaseMutation.mutate(item.id)}
+                disabled={purchaseMutation.isPending}
+              >
                 Add to Cart
               </Button>
             </CardFooter>
