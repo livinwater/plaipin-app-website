@@ -47,7 +47,12 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
+// Initialize the app
+let isInitialized = false;
+
+async function initializeApp() {
+  if (isInitialized) return app;
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -67,13 +72,9 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // For Vercel deployment, export the app without starting the server
+  // For Vercel deployment, don't start the server
   // Vercel will handle the serverless function invocation
-  if (process.env.VERCEL) {
-    // Export for Vercel serverless functions
-    // @ts-ignore
-    global.app = app;
-  } else {
+  if (!process.env.VERCEL) {
     // ALWAYS serve the app on the port specified in the environment variable PORT
     // Other ports are firewalled. Default to 5000 if not specified.
     // this serves both the API and the client.
@@ -83,7 +84,18 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
     });
   }
-})();
+
+  isInitialized = true;
+  return app;
+}
+
+// Start the app immediately if not on Vercel
+if (!process.env.VERCEL) {
+  initializeApp();
+}
 
 // Export for Vercel serverless functions
-export default app;
+export default async function handler(req: any, res: any) {
+  await initializeApp();
+  return app(req, res);
+}

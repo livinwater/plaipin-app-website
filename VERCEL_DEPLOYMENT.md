@@ -29,6 +29,9 @@ HYPERSPELL_TOKEN=your-hyperspell-token
 # OpenAI
 OPENAI_API_KEY=your-openai-api-key
 
+# Vercel Environment (REQUIRED for proper serverless function routing)
+VERCEL=1
+
 # Node Environment
 NODE_ENV=production
 ```
@@ -94,12 +97,23 @@ If the build fails, check:
 2. Dependencies are installed properly
 3. TypeScript compilation succeeds (`npm run check`)
 
-### API Routes Not Working
+### API Routes Returning 404 (MOST COMMON ISSUE)
 
-If API routes return 404:
-1. Verify `dist/index.js` was created during build
-2. Check the Vercel Function logs in your dashboard
-3. Ensure all environment variables are available in production
+If you see errors like:
+```
+Failed to load resource: the server responded with a status of 404 ()
+api/agentmail/messages:1
+api/agentmail/conversations:1
+```
+
+**Solution:**
+1. **CRITICAL**: Set `VERCEL=1` environment variable in your Vercel project settings
+2. Verify all other environment variables are set (especially `AGENTMAIL_API_KEY`)
+3. Redeploy your application: `vercel --prod`
+4. Check Vercel Function logs in your dashboard for any initialization errors
+5. Ensure `dist/index.js` and `api/index.js` exist after build
+
+The `VERCEL=1` environment variable tells the server to run in serverless mode instead of trying to start a traditional HTTP server.
 
 ### Static Files Not Loading
 
