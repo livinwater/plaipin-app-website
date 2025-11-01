@@ -1,15 +1,146 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { insertInventorySchema, insertJournalEntrySchema, insertMessageSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+  app.get("/api/companion", async (_req, res) => {
+    try {
+      const companion = await storage.getDefaultCompanion();
+      res.json(companion);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch companion" });
+    }
+  });
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
+  app.post("/api/companion/interact", async (req, res) => {
+    try {
+      const { action } = req.body;
+      const companion = await storage.getDefaultCompanion();
+      
+      let updates: Partial<typeof companion> = {};
+      
+      switch (action) {
+        case "feed":
+          updates = { energy: Math.min(100, companion.energy + 10), happiness: Math.min(100, companion.happiness + 5) };
+          break;
+        case "play":
+          updates = { happiness: Math.min(100, companion.happiness + 10), energy: Math.max(0, companion.energy - 5) };
+          break;
+        case "train":
+          updates = { level: companion.level + 1, energy: Math.max(0, companion.energy - 10) };
+          break;
+        default:
+          return res.status(400).json({ error: "Invalid action" });
+      }
+      
+      const updated = await storage.updateCompanion(companion.id, updates);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update companion" });
+    }
+  });
+
+  app.get("/api/store/items", async (_req, res) => {
+    try {
+      const items = await storage.getItems();
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch items" });
+    }
+  });
+
+  app.get("/api/inventory", async (_req, res) => {
+    try {
+      const companion = await storage.getDefaultCompanion();
+      const inventory = await storage.getInventory(companion.id);
+      res.json(inventory);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch inventory" });
+    }
+  });
+
+  app.post("/api/inventory/purchase", async (req, res) => {
+    try {
+      const { itemId } = req.body;
+      const companion = await storage.getDefaultCompanion();
+      
+      const parsed = insertInventorySchema.parse({
+        companionId: companion.id,
+        itemId,
+        quantity: 1,
+        equipped: 0,
+      });
+      
+      const inventoryItem = await storage.addToInventory(parsed);
+      res.json(inventoryItem);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to purchase item" });
+    }
+  });
+
+  app.patch("/api/inventory/:id/equip", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { equipped } = req.body;
+      
+      const updated = await storage.updateInventoryItem(id, { equipped: equipped ? 1 : 0 });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update inventory item" });
+    }
+  });
+
+  app.get("/api/journal", async (_req, res) => {
+    try {
+      const companion = await storage.getDefaultCompanion();
+      const entries = await storage.getJournalEntries(companion.id);
+      res.json(entries);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch journal entries" });
+    }
+  });
+
+  app.post("/api/journal", async (req, res) => {
+    try {
+      const companion = await storage.getDefaultCompanion();
+      const parsed = insertJournalEntrySchema.parse({
+        ...req.body,
+        companionId: companion.id,
+      });
+      
+      const entry = await storage.createJournalEntry(parsed);
+      res.json(entry);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to create journal entry" });
+    }
+  });
+
+  app.get("/api/messages", async (_req, res) => {
+    try {
+      const companion = await storage.getDefaultCompanion();
+      const messages = await storage.getMessages(companion.id);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  app.post("/api/messages", async (req, res) => {
+    try {
+      const companion = await storage.getDefaultCompanion();
+      const parsed = insertMessageSchema.parse({
+        ...req.body,
+        companionId: companion.id,
+      });
+      
+      const message = await storage.createMessage(parsed);
+      res.json(message);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to send message" });
+    }
+  });
 
   const httpServer = createServer(app);
-
   return httpServer;
 }
