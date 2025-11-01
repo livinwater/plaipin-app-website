@@ -1,14 +1,16 @@
-import type { 
-  Companion, 
-  InsertCompanion, 
-  Item, 
+import type {
+  Companion,
+  InsertCompanion,
+  Item,
   InsertItem,
   InventoryItem,
   InsertInventoryItem,
   JournalEntry,
   InsertJournalEntry,
   Message,
-  InsertMessage
+  InsertMessage,
+  SearchHistory,
+  InsertSearchHistory
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -16,19 +18,22 @@ export interface IStorage {
   getCompanion(id: string): Promise<Companion | undefined>;
   getDefaultCompanion(): Promise<Companion>;
   updateCompanion(id: string, updates: Partial<Companion>): Promise<Companion>;
-  
+
   getItems(): Promise<Item[]>;
   getItem(id: string): Promise<Item | undefined>;
-  
+
   getInventory(companionId: string): Promise<(InventoryItem & { item: Item })[]>;
   addToInventory(item: InsertInventoryItem): Promise<InventoryItem>;
   updateInventoryItem(id: string, updates: Partial<InventoryItem>): Promise<InventoryItem>;
-  
+
   getJournalEntries(companionId: string): Promise<JournalEntry[]>;
   createJournalEntry(entry: InsertJournalEntry): Promise<JournalEntry>;
-  
+
   getMessages(companionId: string, conversationWith?: string): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
+
+  getSearchHistory(limit?: number): Promise<SearchHistory[]>;
+  createSearchHistory(search: InsertSearchHistory): Promise<SearchHistory>;
 }
 
 export class MemStorage implements IStorage {
@@ -37,6 +42,7 @@ export class MemStorage implements IStorage {
   private inventory: Map<string, InventoryItem>;
   private journalEntries: Map<string, JournalEntry>;
   private messages: Map<string, Message>;
+  private searchHistory: Map<string, SearchHistory>;
   private defaultCompanionId: string;
 
   constructor() {
@@ -45,6 +51,7 @@ export class MemStorage implements IStorage {
     this.inventory = new Map();
     this.journalEntries = new Map();
     this.messages = new Map();
+    this.searchHistory = new Map();
     
     this.defaultCompanionId = randomUUID();
     const defaultCompanion: Companion = {
@@ -262,6 +269,24 @@ export class MemStorage implements IStorage {
     };
     this.messages.set(message.id, message);
     return message;
+  }
+
+  async getSearchHistory(limit: number = 100): Promise<SearchHistory[]> {
+    const entries = Array.from(this.searchHistory.values())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return entries.slice(0, limit);
+  }
+
+  async createSearchHistory(insertSearch: InsertSearchHistory): Promise<SearchHistory> {
+    const search: SearchHistory = {
+      id: randomUUID(),
+      query: insertSearch.query,
+      answer: insertSearch.answer,
+      documents: insertSearch.documents || null,
+      createdAt: new Date(),
+    };
+    this.searchHistory.set(search.id, search);
+    return search;
   }
 }
 

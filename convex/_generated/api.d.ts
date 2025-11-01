@@ -13,6 +13,7 @@ import type * as inventory from "../inventory.js";
 import type * as items from "../items.js";
 import type * as journal from "../journal.js";
 import type * as messages from "../messages.js";
+import type * as searchHistory from "../searchHistory.js";
 import type * as seed from "../seed.js";
 
 import type {
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   items: typeof items;
   journal: typeof journal;
   messages: typeof messages;
+  searchHistory: typeof searchHistory;
   seed: typeof seed;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

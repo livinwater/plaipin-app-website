@@ -296,23 +296,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const senderName = email.from.match(/^([^<]+)/)?.[1]?.trim() || email.from;
 
           const emailContent = `
-Email from ${senderName} (${email.from})
-Subject: ${email.subject}
-Date: ${new Date(email.receivedAt).toISOString()}
-Location: ${metadata?.locationName || 'Unknown location'}
+ENCOUNTER WITH ${senderName} at ${metadata?.locationName || 'Unknown location'}
 
-Message content:
-${email.text}
+I met ${senderName} at ${metadata?.locationName || 'an unknown location'} on ${new Date(email.receivedAt).toLocaleDateString()}.
 
-Contact Information:
-- Sender: ${senderName}
-- Device: ${metadata?.deviceName || 'N/A'} (${metadata?.deviceId || 'N/A'})
-- User ID: ${metadata?.userId || 'N/A'}
-- Location: ${metadata?.locationName || 'N/A'}
-- Coordinates: ${metadata?.latitude || 'N/A'}, ${metadata?.longitude || 'N/A'}
-- Interests/Topics: ${metadata?.topics?.join(', ') || 'N/A'}
+${senderName} was physically present at ${metadata?.locationName || 'this location'} and sent me a message:
 
-This is a communication from ${senderName} sent via AgentMail at ${metadata?.locationName || 'an unknown location'}.
+"${email.text}"
+
+WHO I MET: ${senderName}
+WHERE WE MET: ${metadata?.locationName || 'Unknown location'}
+WHEN: ${new Date(email.receivedAt).toLocaleString()}
+THEIR DEVICE: ${metadata?.deviceName || 'N/A'} (${metadata?.deviceId || 'N/A'})
+THEIR INTERESTS: ${metadata?.topics?.join(', ') || 'N/A'}
+GPS LOCATION: ${metadata?.latitude || 'N/A'}, ${metadata?.longitude || 'N/A'}
+
+IMPORTANT: This is a record of an encounter. ${senderName} was at ${metadata?.locationName || 'this location'} and I met them there.
           `.trim();
 
           // Add to Hyperspell vault with metadata for tracking
@@ -420,13 +419,26 @@ This message was sent from Plaipin, an AI companion platform.`;
           max_results: maxResults,
         },
         answer: true, // Get AI-generated answer
-        answer_model: "deepseek-r1", // Use reasoning model
+        answer_model: "gpt-4o", // Use OpenAI GPT-4o
       });
 
       console.log(`🔍 Search query: "${query}"`);
       console.log(`📊 Found ${response.documents?.length || 0} documents`);
       console.log(`💬 Answer: ${response.answer || '(no answer)'}`);
       console.log(`📦 Full response:`, JSON.stringify(response, null, 2));
+
+      // Save to search history
+      try {
+        await storage.createSearchHistory({
+          query,
+          answer: response.answer || "No answer provided",
+          documents: response.documents ? JSON.stringify(response.documents) : undefined,
+        });
+        console.log(`💾 Saved search to history`);
+      } catch (historyError) {
+        console.error("Failed to save search history:", historyError);
+        // Don't fail the request if history save fails
+      }
 
       res.json({
         answer: response.answer,
@@ -436,6 +448,18 @@ This message was sent from Plaipin, an AI companion platform.`;
     } catch (error) {
       console.error("Failed to search emails:", error);
       res.status(500).json({ error: "Failed to search emails" });
+    }
+  });
+
+  // Get search history
+  app.get("/api/search-history", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const history = await storage.getSearchHistory(limit);
+      res.json(history);
+    } catch (error) {
+      console.error("Failed to fetch search history:", error);
+      res.status(500).json({ error: "Failed to fetch search history" });
     }
   });
 
@@ -470,26 +494,26 @@ This message was sent from Plaipin, an AI companion platform.`;
           // Extract sender info
           const fromAddress = message.from?.address || message.from || 'Unknown';
           const senderName = fromAddress.match(/^([^<]+)/)?.[1]?.trim() || fromAddress;
+          const receivedDate = new Date(message.receivedTimestamp || message.timestamp || new Date());
 
           // Create rich text representation for Hyperspell
           const emailContent = `
-Email from ${senderName} (${fromAddress})
-Subject: ${message.subject || '(No subject)'}
-Date: ${message.receivedTimestamp || message.timestamp || new Date().toISOString()}
-Location: ${metadata?.locationName || 'Unknown location'}
+ENCOUNTER WITH ${senderName} at ${metadata?.locationName || 'Unknown location'}
 
-Message content:
-${text}
+I met ${senderName} at ${metadata?.locationName || 'an unknown location'} on ${receivedDate.toLocaleDateString()}.
 
-Contact Information:
-- Sender: ${senderName}
-- Device: ${metadata?.deviceName || 'N/A'} (${metadata?.deviceId || 'N/A'})
-- User ID: ${metadata?.userId || 'N/A'}
-- Location: ${metadata?.locationName || 'N/A'}
-- Coordinates: ${metadata?.latitude || 'N/A'}, ${metadata?.longitude || 'N/A'}
-- Interests/Topics: ${metadata?.topics?.join(', ') || 'N/A'}
+${senderName} was physically present at ${metadata?.locationName || 'this location'} and sent me a message:
 
-This is a communication from ${senderName} sent via AgentMail at ${metadata?.locationName || 'an unknown location'}.
+"${text}"
+
+WHO I MET: ${senderName}
+WHERE WE MET: ${metadata?.locationName || 'Unknown location'}
+WHEN: ${receivedDate.toLocaleString()}
+THEIR DEVICE: ${metadata?.deviceName || 'N/A'} (${metadata?.deviceId || 'N/A'})
+THEIR INTERESTS: ${metadata?.topics?.join(', ') || 'N/A'}
+GPS LOCATION: ${metadata?.latitude || 'N/A'}, ${metadata?.longitude || 'N/A'}
+
+IMPORTANT: This is a record of an encounter. ${senderName} was at ${metadata?.locationName || 'this location'} and I met them there.
           `.trim();
           
           // Add to Hyperspell vault

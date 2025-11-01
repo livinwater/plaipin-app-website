@@ -42,4 +42,11 @@ export default defineSchema({
   })
     .index("by_companion", ["companionId"])
     .index("by_conversation", ["companionId", "conversationWith"]),
+
+  searchHistory: defineTable({
+    query: v.string(),
+    answer: v.string(),
+    documents: v.optional(v.array(v.any())),
+    timestamp: v.number(),
+  }).index("by_timestamp", ["timestamp"]),
 });

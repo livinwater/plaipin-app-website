@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+
+# Development files
+.env.local
+.env.development
+
+# Build artifacts (will be rebuilt on Vercel)
+dist
+
+# Replit-specific
+.replit
+replit.nix
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage
+
+# Misc
+.DS_Store
+*.swp
+*.swo
+*~

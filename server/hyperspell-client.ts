@@ -2,12 +2,13 @@ import { Hyperspell } from 'hyperspell';
 
 function getCredentials() {
   const apiKey = process.env.HYPERSPELL_TOKEN;
-  
+  const openaiKey = process.env.OPENAI_API_KEY;
+
   if (!apiKey) {
     throw new Error('HYPERSPELL_TOKEN not found in environment variables');
   }
-  
-  return { apiKey };
+
+  return { apiKey, openaiKey };
 }
 
 /**
@@ -16,6 +17,9 @@ function getCredentials() {
  * Note: Pass apiKey directly to bypass HYPERSPELL_TOKEN env var check
  */
 export function getHyperspellClient() {
-  const { apiKey } = getCredentials();
-  return new Hyperspell({ apiKey });
+  const { apiKey, openaiKey } = getCredentials();
+  return new Hyperspell({
+    apiKey,
+    openaiApiKey: openaiKey,
+  } as any);
 }

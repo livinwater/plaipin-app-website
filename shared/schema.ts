@@ -47,6 +47,14 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const searchHistory = pgTable("search_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  query: text("query").notNull(),
+  answer: text("answer").notNull(),
+  documents: text("documents"), // JSON stringified
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertCompanionSchema = createInsertSchema(companions).omit({
   id: true,
 });
@@ -69,6 +77,11 @@ export const insertMessageSchema = createInsertSchema(messages).omit({
   createdAt: true,
 });
 
+export const insertSearchHistorySchema = createInsertSchema(searchHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type Companion = typeof companions.$inferSelect;
 export type InsertCompanion = z.infer<typeof insertCompanionSchema>;
 
@@ -83,3 +96,6 @@ export type InsertJournalEntry = z.infer<typeof insertJournalEntrySchema>;
 
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
+
+export type SearchHistory = typeof searchHistory.$inferSelect;
+export type InsertSearchHistory = z.infer<typeof insertSearchHistorySchema>;
