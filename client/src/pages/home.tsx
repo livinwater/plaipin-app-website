@@ -3,14 +3,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import type { Companion } from "@shared/schema";
 import BuddyModel from "@/components/BuddyModel";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+const whimsicalThoughts = [
+  "Thinking about coffee...",
+  "Wonder if clouds taste like cotton candy?",
+  "Should I learn to juggle?",
+  "Maybe I'll write a poem today...",
+  "Dreaming of adventures in space!",
+  "I bet I could befriend a dragon...",
+  "Planning my next masterpiece!",
+  "Hmm... what if cookies could talk?",
+  "Contemplating the mysteries of friendship...",
+  "Feeling grateful for sunny days!",
+];
 
 export default function Home() {
   const [socialStatus, setSocialStatus] = useState<"open" | "dnd" | "invisible">("open");
+  const [currentThought, setCurrentThought] = useState(whimsicalThoughts[0]);
   
   const { data: companion, isLoading } = useQuery<Companion>({
     queryKey: ["/api/companion"],
   });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const randomThought = whimsicalThoughts[Math.floor(Math.random() * whimsicalThoughts.length)];
+      setCurrentThought(randomThought);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   if (isLoading || !companion) {
     return (
@@ -36,34 +59,18 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
-          <Card data-testid="card-stat-energy">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Energy</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{companion.energy}%</div>
-            </CardContent>
-          </Card>
-          
-          <Card data-testid="card-stat-happiness">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Happiness</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{companion.happiness}%</div>
-            </CardContent>
-          </Card>
-          
-          <Card data-testid="card-stat-level">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Level</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{companion.level}</div>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="bg-gradient-to-br from-primary/5 to-primary/10" data-testid="card-thoughts">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="text-3xl">💭</div>
+              <div className="flex-1">
+                <p className="text-lg italic text-muted-foreground transition-all duration-500">
+                  {currentThought}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
