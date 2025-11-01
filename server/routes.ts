@@ -198,37 +198,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // List all messages
       const messagesResponse = await client.inboxes.messages.list(inboxId, { limit: 100 });
       
-      // Filter and transform messages
-      const filteredEmails = (messagesResponse.messages || [])
+      // Filter messages by sender first
+      const matchingMessages = (messagesResponse.messages || [])
         .filter((message: any) => {
           const sender = message.from?.address || message.from;
           return sender.includes(from as string);
-        })
-        .map((message: any) => {
-          // Extract metadata from email body if it exists
-          const text = message.text || "";
-          let metadata = {};
-          
-          // Look for JSON metadata block in email body
-          const metadataMatch = text.match(/---\s*PLAIPIN METADATA\s*---\s*({[\s\S]*?})\s*---/);
-          if (metadataMatch) {
-            try {
-              metadata = JSON.parse(metadataMatch[1]);
-            } catch (e) {
-              console.error("Failed to parse metadata:", e);
+        });
+      
+      // Fetch full message content for each message
+      const filteredEmails = await Promise.all(
+        matchingMessages.map(async (message: any) => {
+          try {
+            // Fetch the full message to get the body
+            const fullMessage = await client.inboxes.messages.get(inboxId, message.messageId);
+            const text = fullMessage.text || fullMessage.html || "";
+            let metadata = {};
+            
+            // Look for JSON metadata block in email body
+            const metadataMatch = text.match(/---\s*PLAIPIN METADATA\s*---\s*({[\s\S]*?})\s*---/);
+            if (metadataMatch) {
+              try {
+                metadata = JSON.parse(metadataMatch[1]);
+              } catch (e) {
+                console.error("Failed to parse metadata:", e);
+              }
             }
+            
+            return {
+              id: message.messageId,
+              from: message.from?.address || message.from,
+              subject: message.subject || "(No subject)",
+              text: text,
+              receivedAt: message.receivedTimestamp || message.timestamp,
+              metadata,
+            };
+          } catch (error) {
+            console.error(`Failed to fetch message ${message.messageId}:`, error);
+            return {
+              id: message.messageId,
+              from: message.from?.address || message.from,
+              subject: message.subject || "(No subject)",
+              text: "",
+              receivedAt: message.receivedTimestamp || message.timestamp,
+              metadata: {},
+            };
           }
-          
-          return {
-            id: message.messageId,
-            from: message.from?.address || message.from,
-            subject: message.subject || "(No subject)",
-            text: text,
-            receivedAt: message.receivedTimestamp || message.timestamp,
-            metadata,
-          };
         })
-        .sort((a: any, b: any) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime());
+      );
+      
+      // Sort by timestamp
+      filteredEmails.sort((a: any, b: any) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime());
       
       res.json(filteredEmails);
     } catch (error) {
