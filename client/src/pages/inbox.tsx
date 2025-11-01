@@ -6,12 +6,23 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
+interface EmailMetadata {
+  userId?: string;
+  deviceId?: string;
+  deviceName?: string;
+  latitude?: number;
+  longitude?: number;
+  topics?: string;
+  locationName?: string;
+}
+
 interface EmailMessage {
   id: string;
   from: string;
   subject: string;
   text: string;
   receivedAt: string;
+  metadata?: EmailMetadata;
 }
 
 interface Conversation {
@@ -109,7 +120,53 @@ export default function Inbox() {
                       </span>
                     </div>
                     <div className="text-sm font-medium text-muted-foreground mb-2">{message.subject}</div>
-                    <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+                    <p className="text-sm whitespace-pre-wrap mb-3">{message.text}</p>
+                    
+                    {message.metadata && Object.keys(message.metadata).length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-border">
+                        <div className="text-xs font-semibold text-muted-foreground mb-2">Device Info:</div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {message.metadata.deviceName && (
+                            <div>
+                              <span className="text-muted-foreground">Device:</span>{" "}
+                              <span className="font-medium">{message.metadata.deviceName}</span>
+                            </div>
+                          )}
+                          {message.metadata.deviceId && (
+                            <div>
+                              <span className="text-muted-foreground">ID:</span>{" "}
+                              <span className="font-medium">{message.metadata.deviceId}</span>
+                            </div>
+                          )}
+                          {message.metadata.userId && (
+                            <div>
+                              <span className="text-muted-foreground">User:</span>{" "}
+                              <span className="font-medium">{message.metadata.userId}</span>
+                            </div>
+                          )}
+                          {message.metadata.locationName && (
+                            <div>
+                              <span className="text-muted-foreground">Location:</span>{" "}
+                              <span className="font-medium">{message.metadata.locationName}</span>
+                            </div>
+                          )}
+                          {message.metadata.latitude && message.metadata.longitude && (
+                            <div>
+                              <span className="text-muted-foreground">Coords:</span>{" "}
+                              <span className="font-medium">
+                                {message.metadata.latitude.toFixed(4)}, {message.metadata.longitude.toFixed(4)}
+                              </span>
+                            </div>
+                          )}
+                          {message.metadata.topics && (
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Topics:</span>{" "}
+                              <span className="font-medium">{message.metadata.topics}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}

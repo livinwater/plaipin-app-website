@@ -183,15 +183,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const emails = await client.inbox.list({ limit: 50 });
       
       const filteredEmails = emails.items
-        .filter(email => email.from === from)
-        .map(email => ({
+        .filter((email: any) => email.from === from)
+        .map((email: any) => ({
           id: email.id,
           from: email.from,
           subject: email.subject || "(No subject)",
           text: email.text || email.html || "",
           receivedAt: email.receivedAt,
+          metadata: email.metadata || {},
         }))
-        .sort((a, b) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime());
+        .sort((a: any, b: any) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime());
       
       res.json(filteredEmails);
     } catch (error) {
@@ -211,10 +212,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getUncachableAgentMailClient } = await import("./agentmail-client.js");
       const client = await getUncachableAgentMailClient();
       
+      // Add Plaipin metadata to email
+      const metadata = {
+        userId: "user_demo_123",
+        deviceId: "plaipin_742",
+        deviceName: "Plaipin #742",
+        latitude: 37.7749,
+        longitude: -122.4194,
+        topics: "robot, raves, hiking",
+        locationName: "Blue Bottle Coffee, SF"
+      };
+      
       const result = await client.send.email({
         to,
         subject,
         text,
+        metadata,
       });
       
       res.json(result);

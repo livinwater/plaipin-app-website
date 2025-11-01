@@ -119,24 +119,24 @@ export default function Journal() {
 
       <div className="space-y-6">
         {entries.map((entry) => (
-          <Card key={entry._id} className="hover-elevate cursor-pointer" data-testid={`card-entry-${entry._id}`}>
+          <Card key={entry.id} className="hover-elevate cursor-pointer" data-testid={`card-entry-${entry.id}`}>
             <CardHeader>
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1">
-                  <CardTitle className="mb-2" data-testid={`text-entry-title-${entry._id}`}>{entry.title}</CardTitle>
+                  <CardTitle className="mb-2" data-testid={`text-entry-title-${entry.id}`}>{entry.title}</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    {new Date(entry._creationTime).toLocaleDateString('en-US', { 
+                    {new Date(entry.createdAt).toLocaleDateString('en-US', { 
                       year: 'numeric', 
                       month: 'long', 
                       day: 'numeric' 
                     })}
                   </p>
                 </div>
-                <span className="text-2xl" data-testid={`text-entry-mood-${entry._id}`}>{entry.mood}</span>
+                <span className="text-2xl" data-testid={`text-entry-mood-${entry.id}`}>{entry.mood}</span>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground" data-testid={`text-entry-preview-${entry._id}`}>
+              <p className="text-muted-foreground" data-testid={`text-entry-preview-${entry.id}`}>
                 {entry.content}
               </p>
             </CardContent>

@@ -1,4 +1,4 @@
-import { AgentMail } from 'agentmail';
+import { AgentMailClient } from 'agentmail';
 
 let connectionSettings: any;
 
@@ -35,8 +35,9 @@ async function getCredentials() {
 // Always call this function again to get a fresh client.
 export async function getUncachableAgentMailClient() {
   const {apiKey} = await getCredentials();
-  return new AgentMail({
+  const client = new AgentMailClient({
     baseUrl: "https://api.agentmail.to",
     apiKey: apiKey
   });
+  return client;
 }
