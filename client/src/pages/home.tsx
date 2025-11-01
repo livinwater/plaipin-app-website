@@ -1,36 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Heart, Sparkles, TrendingUp } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 import type { Companion } from "@shared/schema";
-import { useToast } from "@/hooks/use-toast";
 import BuddyModel from "@/components/BuddyModel";
 
 export default function Home() {
-  const { toast } = useToast();
-
   const { data: companion, isLoading } = useQuery<Companion>({
     queryKey: ["/api/companion"],
   });
-
-  const interactMutation = useMutation({
-    mutationFn: async (action: string) => {
-      return apiRequest("POST", "/api/companion/interact", { action });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/companion"] });
-    },
-  });
-
-  const handleInteraction = (action: string, label: string) => {
-    interactMutation.mutate(action);
-    toast({
-      title: `${label}!`,
-      description: `You just interacted with ${companion?.name || 'Buddy'}`,
-    });
-  };
 
   if (isLoading || !companion) {
     return (
@@ -83,30 +60,6 @@ export default function Home() {
               <div className="text-2xl font-bold">{companion.level}</div>
             </CardContent>
           </Card>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          <Button 
-            variant="outline" 
-            className="flex flex-col items-center gap-2 h-auto py-6" 
-            data-testid="button-play"
-            onClick={() => handleInteraction("play", "Played")}
-            disabled={interactMutation.isPending}
-          >
-            <Sparkles className="w-6 h-6 text-primary" />
-            <span>Play</span>
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            className="flex flex-col items-center gap-2 h-auto py-6" 
-            data-testid="button-train"
-            onClick={() => handleInteraction("train", "Trained")}
-            disabled={interactMutation.isPending}
-          >
-            <TrendingUp className="w-6 h-6 text-primary" />
-            <span>Train</span>
-          </Button>
         </div>
 
         <Card>
