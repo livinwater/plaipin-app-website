@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertInventorySchema, insertJournalEntrySchema, insertMessageSchema } from "@shared/schema";
+import { getUncachableAgentMailClient } from "./agentmail-client";
+import { getHyperspellClient } from "./hyperspell-client";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/companion", async (_req, res) => {
@@ -150,7 +152,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('ETag', 'false');
     
     try {
-      const { getUncachableAgentMailClient } = await import("./agentmail-client.js");
       const client = await getUncachableAgentMailClient();
       
       // Get all inboxes
@@ -202,7 +203,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { from } = req.query;
 
-      const { getUncachableAgentMailClient } = await import("./agentmail-client.js");
       const client = await getUncachableAgentMailClient();
 
       // Get all inboxes
@@ -284,7 +284,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Store emails in Hyperspell for semantic search (with deduplication)
       console.log(`📝 Attempting to store ${filteredEmails.length} emails in Hyperspell...`);
       try {
-        const { getHyperspellClient } = await import("./hyperspell-client.js");
         const hyperspell = getHyperspellClient();
         console.log(`✓ Hyperspell client initialized`);
 
@@ -349,7 +348,6 @@ IMPORTANT: This is a record of an encounter. ${senderName} was at ${metadata?.lo
         return res.status(400).json({ error: "Missing required fields: to, subject, text" });
       }
 
-      const { getUncachableAgentMailClient } = await import("./agentmail-client.js");
       const client = await getUncachableAgentMailClient();
       
       // Get all inboxes
@@ -404,7 +402,6 @@ This message was sent from Plaipin, an AI companion platform.`;
         return res.status(400).json({ error: "Missing 'query' parameter" });
       }
 
-      const { getHyperspellClient } = await import("./hyperspell-client.js");
       const hyperspell = getHyperspellClient();
       
       // Semantic search over stored emails
@@ -476,7 +473,6 @@ This message was sent from Plaipin, an AI companion platform.`;
       if (event === "message.received" && message) {
         // Store in Hyperspell
         try {
-          const { getHyperspellClient } = await import("./hyperspell-client.js");
           const hyperspell = getHyperspellClient();
           
           // Parse metadata if present
