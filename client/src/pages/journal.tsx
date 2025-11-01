@@ -5,10 +5,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Plus } from "lucide-react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import type { JournalEntry } from "@shared/schema";
 
 export default function Journal() {
   const { toast } = useToast();
@@ -17,17 +18,16 @@ export default function Journal() {
   const [content, setContent] = useState("");
   const [mood, setMood] = useState("");
 
-  const companion = useQuery(api.companions.getDefault);
-  const entries = useQuery(
-    api.journal.getByCompanion,
-    companion ? { companionId: companion._id } : "skip"
-  ) ?? [];
+  const { data: entries = [], isLoading } = useQuery<JournalEntry[]>({
+    queryKey: ["/api/journal"],
+  });
 
-  const createEntryMutation = useMutation(api.journal.create);
-
-  const handleSubmit = async () => {
-    if (title && content && mood && companion) {
-      await createEntryMutation({ companionId: companion._id, title, content, mood });
+  const createEntryMutation = useMutation({
+    mutationFn: async (entry: { title: string; content: string; mood: string }) => {
+      return apiRequest("POST", "/api/journal", entry);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/journal"] });
       setIsDialogOpen(false);
       setTitle("");
       setContent("");
@@ -36,10 +36,16 @@ export default function Journal() {
         title: "Entry created!",
         description: "Your journal entry has been saved",
       });
+    },
+  });
+
+  const handleSubmit = async () => {
+    if (title && content && mood) {
+      createEntryMutation.mutate({ title, content, mood });
     }
   };
 
-  if (entries === undefined) {
+  if (isLoading) {
     return (
       <div className="p-8 max-w-4xl">
         <div className="text-muted-foreground">Loading journal...</div>

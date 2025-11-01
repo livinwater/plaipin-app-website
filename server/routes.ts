@@ -142,6 +142,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // AgentMail routes
+  app.get("/api/agentmail/conversations", async (_req, res) => {
+    try {
+      const { getUncachableAgentMailClient } = await import("./agentmail-client.js");
+      const client = await getUncachableAgentMailClient();
+      const emails = await client.inbox.list({ limit: 50 });
+      
+      // Group emails by sender to create conversations
+      const conversationMap = new Map();
+      
+      for (const email of emails.items) {
+        const from = email.from;
+        if (!conversationMap.has(from) || new Date(email.receivedAt) > new Date(conversationMap.get(from).lastReceivedAt)) {
+          conversationMap.set(from, {
+            from,
+            lastSubject: email.subject || "(No subject)",
+            lastReceivedAt: email.receivedAt,
+            unreadCount: 0,
+          });
+        }
+      }
+      
+      res.json(Array.from(conversationMap.values()));
+    } catch (error) {
+      console.error("Failed to fetch conversations:", error);
+      res.status(500).json({ error: "Failed to fetch conversations" });
+    }
+  });
+
+  app.get("/api/agentmail/messages", async (req, res) => {
+    try {
+      const { from } = req.query;
+      if (!from) {
+        return res.status(400).json({ error: "Missing 'from' parameter" });
+      }
+
+      const { getUncachableAgentMailClient } = await import("./agentmail-client.js");
+      const client = await getUncachableAgentMailClient();
+      const emails = await client.inbox.list({ limit: 50 });
+      
+      const filteredEmails = emails.items
+        .filter(email => email.from === from)
+        .map(email => ({
+          id: email.id,
+          from: email.from,
+          subject: email.subject || "(No subject)",
+          text: email.text || email.html || "",
+          receivedAt: email.receivedAt,
+        }))
+        .sort((a, b) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime());
+      
+      res.json(filteredEmails);
+    } catch (error) {
+      console.error("Failed to fetch messages:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  app.post("/api/agentmail/send", async (req, res) => {
+    try {
+      const { to, subject, text } = req.body;
+      
+      if (!to || !subject || !text) {
+        return res.status(400).json({ error: "Missing required fields: to, subject, text" });
+      }
+
+      const { getUncachableAgentMailClient } = await import("./agentmail-client.js");
+      const client = await getUncachableAgentMailClient();
+      
+      const result = await client.send.email({
+        to,
+        subject,
+        text,
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to send email:", error);
+      res.status(500).json({ error: "Failed to send email" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
