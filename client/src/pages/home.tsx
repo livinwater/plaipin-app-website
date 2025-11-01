@@ -5,8 +5,8 @@ import { Heart, Sparkles, TrendingUp } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Companion } from "@shared/schema";
-import buddyImage from "@assets/generated_images/Pink_bunny_AI_companion_e8d83ce8.png";
 import { useToast } from "@/hooks/use-toast";
+import BuddyModel from "@/components/BuddyModel";
 
 export default function Home() {
   const { toast } = useToast();
@@ -44,13 +44,8 @@ export default function Home() {
     <div className="flex flex-col items-center justify-start min-h-full p-8">
       <div className="max-w-4xl w-full space-y-8">
         <div className="flex flex-col items-center space-y-6">
-          <div className="w-64 h-64 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center p-8">
-            <img 
-              src={buddyImage} 
-              alt="Buddy - Your AI Companion" 
-              className="w-full h-full object-contain"
-              data-testid="img-buddy"
-            />
+          <div className="w-64 h-64 flex items-center justify-center">
+            <BuddyModel />
           </div>
           
           <div className="text-center space-y-3">
