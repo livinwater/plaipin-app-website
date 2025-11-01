@@ -147,24 +147,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { getUncachableAgentMailClient } = await import("./agentmail-client.js");
       const client = await getUncachableAgentMailClient();
-      const emails = await client.inbox.list({ limit: 50 });
       
-      // Group emails by sender to create conversations
-      const conversationMap = new Map();
-      
-      for (const email of emails.items) {
-        const from = email.from;
-        if (!conversationMap.has(from) || new Date(email.receivedAt) > new Date(conversationMap.get(from).lastReceivedAt)) {
-          conversationMap.set(from, {
-            from,
-            lastSubject: email.subject || "(No subject)",
-            lastReceivedAt: email.receivedAt,
-            unreadCount: 0,
-          });
-        }
+      // Get all inboxes
+      const inboxesResponse = await client.inboxes.list();
+      if (!inboxesResponse.inboxes || inboxesResponse.inboxes.length === 0) {
+        return res.json([]);
       }
       
-      res.json(Array.from(conversationMap.values()));
+      // Use the first inbox
+      const inboxId = inboxesResponse.inboxes[0].inboxId;
+      
+      // List threads (conversations)
+      const threadsResponse = await client.inboxes.threads.list(inboxId, { limit: 50 });
+      
+      // Transform threads to conversations format
+      const conversations = (threadsResponse.threads || []).map((thread: any) => ({
+        from: thread.senders?.[0] || "Unknown",
+        lastSubject: thread.subject || "(No subject)",
+        lastReceivedAt: thread.receivedTimestamp || thread.timestamp,
+        unreadCount: 0,
+        threadId: thread.threadId,
+      }));
+      
+      res.json(conversations);
     } catch (error) {
       console.error("Failed to fetch conversations:", error);
       res.status(500).json({ error: "Failed to fetch conversations" });
@@ -180,18 +185,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { getUncachableAgentMailClient } = await import("./agentmail-client.js");
       const client = await getUncachableAgentMailClient();
-      const emails = await client.inbox.list({ limit: 50 });
       
-      const filteredEmails = emails.items
-        .filter((email: any) => email.from === from)
-        .map((email: any) => ({
-          id: email.id,
-          from: email.from,
-          subject: email.subject || "(No subject)",
-          text: email.text || email.html || "",
-          receivedAt: email.receivedAt,
-          metadata: email.metadata || {},
-        }))
+      // Get all inboxes
+      const inboxesResponse = await client.inboxes.list();
+      if (!inboxesResponse.inboxes || inboxesResponse.inboxes.length === 0) {
+        return res.json([]);
+      }
+      
+      // Use the first inbox
+      const inboxId = inboxesResponse.inboxes[0].inboxId;
+      
+      // List all messages
+      const messagesResponse = await client.inboxes.messages.list(inboxId, { limit: 100 });
+      
+      // Filter and transform messages
+      const filteredEmails = (messagesResponse.messages || [])
+        .filter((message: any) => {
+          const sender = message.from?.address || message.from;
+          return sender.includes(from as string);
+        })
+        .map((message: any) => {
+          // Extract metadata from email body if it exists
+          const text = message.text || "";
+          let metadata = {};
+          
+          // Look for JSON metadata block in email body
+          const metadataMatch = text.match(/---\s*PLAIPIN METADATA\s*---\s*({[\s\S]*?})\s*---/);
+          if (metadataMatch) {
+            try {
+              metadata = JSON.parse(metadataMatch[1]);
+            } catch (e) {
+              console.error("Failed to parse metadata:", e);
+            }
+          }
+          
+          return {
+            id: message.messageId,
+            from: message.from?.address || message.from,
+            subject: message.subject || "(No subject)",
+            text: text,
+            receivedAt: message.receivedTimestamp || message.timestamp,
+            metadata,
+          };
+        })
         .sort((a: any, b: any) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime());
       
       res.json(filteredEmails);
@@ -212,22 +248,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getUncachableAgentMailClient } = await import("./agentmail-client.js");
       const client = await getUncachableAgentMailClient();
       
-      // Add Plaipin metadata to email
+      // Get all inboxes
+      const inboxesResponse = await client.inboxes.list();
+      if (!inboxesResponse.inboxes || inboxesResponse.inboxes.length === 0) {
+        return res.status(400).json({ error: "No inbox found. Please create an inbox first." });
+      }
+      
+      // Use the first inbox
+      const inboxId = inboxesResponse.inboxes[0].inboxId;
+      
+      // Add Plaipin metadata as a structured JSON block in the email body
+      // This makes it easy for LLMs to parse and summarize
       const metadata = {
         userId: "user_demo_123",
         deviceId: "plaipin_742",
         deviceName: "Plaipin #742",
         latitude: 37.7749,
         longitude: -122.4194,
-        topics: "robot, raves, hiking",
+        topics: ["robots", "raves", "hiking"],
         locationName: "Blue Bottle Coffee, SF"
       };
       
-      const result = await client.send.email({
-        to,
+      // Format email with metadata for easy LLM parsing
+      const emailBody = `${text}
+
+--- PLAIPIN METADATA ---
+${JSON.stringify(metadata, null, 2)}
+---
+
+This message was sent from Plaipin, an AI companion platform.`;
+      
+      const result = await client.inboxes.messages.send(inboxId, {
+        to: [to],
         subject,
-        text,
-        metadata,
+        text: emailBody,
       });
       
       res.json(result);
