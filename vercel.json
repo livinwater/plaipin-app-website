@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "npm run build && cp dist/index.js api/server.js",
   "outputDirectory": "dist/public",
   "functions": {
     "api/*.js": {
