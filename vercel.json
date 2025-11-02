@@ -2,22 +2,9 @@
   "version": 2,
   "outputDirectory": "dist/public",
   "functions": {
-    "api/*.js": {
+    "api/**/*.ts": {
       "memory": 1024,
       "maxDuration": 10
     }
-  },
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/index.js"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ]
+  }
 }
