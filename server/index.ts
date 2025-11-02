@@ -1,17 +1,9 @@
-// Only load dotenv in development (not on Vercel)
-// Vercel provides env vars directly, no .env file needed
-if (!process.env.VERCEL) {
-  try {
-    require("dotenv/config");
-  } catch (e) {
-    // .env file not found, that's okay on Vercel
-  }
-}
-
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
+// Note: dotenv is loaded in dev script via tsx, not here
+// Vercel provides env vars directly from dashboard
 const app = express();
 
 declare module 'http' {
