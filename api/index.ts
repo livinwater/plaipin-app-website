@@ -1,5 +1,3 @@
 // Vercel serverless function entry point
-// The server.js file is copied here during build
-import handler from './server.js';
-
-export default handler;
+// Vercel will compile TypeScript and use node_modules directly
+export { default } from '../server/index';
