@@ -152,11 +152,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('ETag', 'false');
     
     try {
+      console.log("🔍 Starting conversations fetch...");
       const client = await getUncachableAgentMailClient();
+      console.log("✓ AgentMail client initialized");
       
       // Get all inboxes
+      console.log("📬 Fetching inboxes...");
       const inboxesResponse = await client.inboxes.list();
+      console.log(`✓ Got ${inboxesResponse.inboxes?.length || 0} inboxes`);
+      
       if (!inboxesResponse.inboxes || inboxesResponse.inboxes.length === 0) {
+        console.log("⚠️ No inboxes found");
         return res.json([]);
       }
 
@@ -165,7 +171,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const inbox of inboxesResponse.inboxes) {
         try {
+          console.log(`📨 Fetching threads for inbox: ${inbox.inboxId}`);
           const threadsResponse = await client.inboxes.threads.list(inbox.inboxId, { limit: 50 });
+          console.log(`✓ Got ${threadsResponse.threads?.length || 0} threads from ${inbox.inboxId}`);
+          
           const conversations = (threadsResponse.threads || []).map((thread: any) => ({
             from: thread.senders?.[0] || "Unknown",
             lastSubject: thread.subject || "(No subject)",
@@ -175,8 +184,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             inboxId: inbox.inboxId, // Track which inbox this conversation is from
           }));
           allConversations.push(...conversations);
-        } catch (error) {
-          console.error(`Failed to fetch threads from inbox ${inbox.inboxId}:`, error);
+        } catch (error: any) {
+          console.error(`❌ Failed to fetch threads from inbox ${inbox.inboxId}:`, error);
+          console.error("Error details:", error?.message, error?.statusCode);
         }
       }
 
@@ -185,12 +195,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         new Date(b.lastReceivedAt).getTime() - new Date(a.lastReceivedAt).getTime()
       );
 
+      console.log(`✅ Returning ${allConversations.length} conversations`);
       res.json(allConversations);
     } catch (error: any) {
-      console.error("Failed to fetch conversations:", error);
+      console.error("❌ FATAL: Failed to fetch conversations:", error);
       console.error("Error stack:", error?.stack);
       console.error("Error message:", error?.message);
-      res.status(500).json({ error: "Failed to fetch conversations", details: error?.message });
+      console.error("Error name:", error?.name);
+      console.error("Error statusCode:", error?.statusCode);
+      res.status(500).json({ error: "Failed to fetch conversations", details: error?.message, name: error?.name });
     }
   });
 
@@ -202,12 +215,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const { from } = req.query;
+      console.log(`🔍 Starting messages fetch... (from filter: ${from || 'none'})`);
 
       const client = await getUncachableAgentMailClient();
+      console.log("✓ AgentMail client initialized");
 
       // Get all inboxes
+      console.log("📬 Fetching inboxes...");
       const inboxesResponse = await client.inboxes.list();
+      console.log(`✓ Got ${inboxesResponse.inboxes?.length || 0} inboxes`);
+      
       if (!inboxesResponse.inboxes || inboxesResponse.inboxes.length === 0) {
+        console.log("⚠️ No inboxes found");
         return res.json([]);
       }
 
@@ -216,7 +235,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const inbox of inboxesResponse.inboxes) {
         try {
+          console.log(`📩 Fetching messages for inbox: ${inbox.inboxId}`);
           const messagesResponse = await client.inboxes.messages.list(inbox.inboxId, { limit: 100 });
+          console.log(`✓ Got ${messagesResponse.messages?.length || 0} messages from ${inbox.inboxId}`);
+          
           const messages = (messagesResponse.messages || [])
             .filter((message: any) => {
               // If 'from' parameter provided, filter by sender
@@ -232,10 +254,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               _inboxId: inbox.inboxId, // Track which inbox this message is from
             }));
           matchingMessages.push(...messages);
-        } catch (error) {
-          console.error(`Failed to fetch messages from inbox ${inbox.inboxId}:`, error);
+        } catch (error: any) {
+          console.error(`❌ Failed to fetch messages from inbox ${inbox.inboxId}:`, error);
+          console.error("Error details:", error?.message, error?.statusCode);
         }
       }
+      
+      console.log(`📝 Processing ${matchingMessages.length} messages...`);
       
       // Fetch full message content for each message
       const filteredEmails = await Promise.all(

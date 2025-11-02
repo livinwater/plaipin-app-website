@@ -472,15 +472,22 @@ async function registerRoutes(app2) {
     res.setHeader("Pragma", "no-cache");
     res.setHeader("ETag", "false");
     try {
+      console.log("\u{1F50D} Starting conversations fetch...");
       const client = await getUncachableAgentMailClient();
+      console.log("\u2713 AgentMail client initialized");
+      console.log("\u{1F4EC} Fetching inboxes...");
       const inboxesResponse = await client.inboxes.list();
+      console.log(`\u2713 Got ${inboxesResponse.inboxes?.length || 0} inboxes`);
       if (!inboxesResponse.inboxes || inboxesResponse.inboxes.length === 0) {
+        console.log("\u26A0\uFE0F No inboxes found");
         return res.json([]);
       }
       const allConversations = [];
       for (const inbox of inboxesResponse.inboxes) {
         try {
+          console.log(`\u{1F4E8} Fetching threads for inbox: ${inbox.inboxId}`);
           const threadsResponse = await client.inboxes.threads.list(inbox.inboxId, { limit: 50 });
+          console.log(`\u2713 Got ${threadsResponse.threads?.length || 0} threads from ${inbox.inboxId}`);
           const conversations = (threadsResponse.threads || []).map((thread) => ({
             from: thread.senders?.[0] || "Unknown",
             lastSubject: thread.subject || "(No subject)",
@@ -492,18 +499,22 @@ async function registerRoutes(app2) {
           }));
           allConversations.push(...conversations);
         } catch (error) {
-          console.error(`Failed to fetch threads from inbox ${inbox.inboxId}:`, error);
+          console.error(`\u274C Failed to fetch threads from inbox ${inbox.inboxId}:`, error);
+          console.error("Error details:", error?.message, error?.statusCode);
         }
       }
       allConversations.sort(
         (a, b) => new Date(b.lastReceivedAt).getTime() - new Date(a.lastReceivedAt).getTime()
       );
+      console.log(`\u2705 Returning ${allConversations.length} conversations`);
       res.json(allConversations);
     } catch (error) {
-      console.error("Failed to fetch conversations:", error);
+      console.error("\u274C FATAL: Failed to fetch conversations:", error);
       console.error("Error stack:", error?.stack);
       console.error("Error message:", error?.message);
-      res.status(500).json({ error: "Failed to fetch conversations", details: error?.message });
+      console.error("Error name:", error?.name);
+      console.error("Error statusCode:", error?.statusCode);
+      res.status(500).json({ error: "Failed to fetch conversations", details: error?.message, name: error?.name });
     }
   });
   app2.get("/api/agentmail/messages", async (req, res) => {
@@ -512,15 +523,22 @@ async function registerRoutes(app2) {
     res.setHeader("ETag", "false");
     try {
       const { from } = req.query;
+      console.log(`\u{1F50D} Starting messages fetch... (from filter: ${from || "none"})`);
       const client = await getUncachableAgentMailClient();
+      console.log("\u2713 AgentMail client initialized");
+      console.log("\u{1F4EC} Fetching inboxes...");
       const inboxesResponse = await client.inboxes.list();
+      console.log(`\u2713 Got ${inboxesResponse.inboxes?.length || 0} inboxes`);
       if (!inboxesResponse.inboxes || inboxesResponse.inboxes.length === 0) {
+        console.log("\u26A0\uFE0F No inboxes found");
         return res.json([]);
       }
       let matchingMessages = [];
       for (const inbox of inboxesResponse.inboxes) {
         try {
+          console.log(`\u{1F4E9} Fetching messages for inbox: ${inbox.inboxId}`);
           const messagesResponse = await client.inboxes.messages.list(inbox.inboxId, { limit: 100 });
+          console.log(`\u2713 Got ${messagesResponse.messages?.length || 0} messages from ${inbox.inboxId}`);
           const messages2 = (messagesResponse.messages || []).filter((message) => {
             if (from) {
               const sender = message.from?.address || message.from;
@@ -534,9 +552,11 @@ async function registerRoutes(app2) {
           }));
           matchingMessages.push(...messages2);
         } catch (error) {
-          console.error(`Failed to fetch messages from inbox ${inbox.inboxId}:`, error);
+          console.error(`\u274C Failed to fetch messages from inbox ${inbox.inboxId}:`, error);
+          console.error("Error details:", error?.message, error?.statusCode);
         }
       }
+      console.log(`\u{1F4DD} Processing ${matchingMessages.length} messages...`);
       const filteredEmails = await Promise.all(
         matchingMessages.map(async (message) => {
           try {
